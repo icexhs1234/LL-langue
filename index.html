@@ -3,305 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>心词典 - 懂温度的 AI 学习</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon.png">
+    <title>我的词典 - AI Dictionary</title>
+    <link rel="apple-touch-icon" href="icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root {
-            --primary: #ff8e8e;
-            --secondary: #7ec7ff;
-            --bg: #fffafa;
-            --card-font-size: 16px;
-        }
-        body { background-color: var(--bg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border-radius: 24px; border: 1px solid rgba(255,255,255,0.3); }
-        
-        /* 翻转动画 */
-        .flip-card { perspective: 1000px; height: 400px; }
-        .flip-card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
-        .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
-        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; padding: 20px; flex-direction: column; }
-        .flip-card-back { transform: rotateY(180deg); }
-
-        /* 底部导航 */
-        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px; border-top: 1px solid #eee; z-index: 50; }
-        
-        .tab-content { display: none; padding-bottom: 80px; }
-        .tab-content.active { display: block; }
-        
-        .btn-srs { padding: 10px 20px; border-radius: 12px; font-weight: bold; color: white; transition: 0.2s; }
-        .btn-master { background-color: #4ade80; }
-        .btn-vague { background-color: #fbbf24; }
-        .btn-forget { background-color: #f87171; }
+        .flashcard-inner { transition: transform 0.6s; transform-style: preserve-3d; }
+        .flipped { transform: rotateY(180deg); }
+        .back { backface-visibility: hidden; transform: rotateY(180deg); }
+        .front { backface-visibility: hidden; }
     </style>
 </head>
-<body class="safe-area-inset">
+<body class="bg-green-50 min-h-screen font-sans text-slate-800">
 
-    <!-- 初始化语言设置层 -->
-    <div id="onboarding" class="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center p-6 text-center hidden">
-        <img src="icon.png" class="w-32 h-32 mb-6 rounded-3xl shadow-lg">
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">欢迎来到心词典</h1>
-        <p class="text-gray-500 mb-8">选择你的语言偏好，开启探索</p>
-        <div class="w-full space-y-4">
-            <select id="nativeLang" class="w-full p-4 rounded-xl border border-pink-100 bg-pink-50 outline-none">
-                <option value="zh">我的母语：中文</option>
-                <option value="en">Native: English</option>
-                <option value="ja">母国語：日本語</option>
-                <!-- 其他语言 -->
-            </select>
-            <select id="targetLang" class="w-full p-4 rounded-xl border border-blue-100 bg-blue-50 outline-none">
-                <option value="en">目标语言：英语</option>
-                <option value="zh">Target: Chinese</option>
-                <option value="ja">目標：日本語</option>
-                <option value="fr">Target: French</option>
-            </select>
-            <button onclick="saveSettings()" class="w-full bg-pink-400 text-white py-4 rounded-xl font-bold shadow-lg shadow-pink-100">进入世界</button>
-        </div>
+    <!-- 1. 语言设置模态框 (持久化) -->
+    <div id="lang-setup" class="fixed inset-0 bg-white z-50 flex flex-col p-8 hidden">
+        <h1 class="text-3xl font-bold mb-6 text-green-600">设置语言偏好</h1>
+        <label class="mb-2 font-medium">我的母语：</label>
+        <select id="native-lang" class="p-3 bg-white border-2 border-green-200 rounded-xl mb-4">
+            <option value="zh-CN">中文 (简体)</option>
+            <option value="en-US">English</option>
+            <!-- 更多语言... -->
+        </select>
+        <label class="mb-2 font-medium">我要学习：</label>
+        <select id="target-lang" class="p-3 bg-white border-2 border-green-200 rounded-xl mb-8">
+            <option value="en-US">English</option>
+            <option value="ja-JP">日本語</option>
+            <option value="es-ES">Español</option>
+        </select>
+        <button onclick="saveSettings()" class="bg-green-500 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition">开启学习之旅</button>
     </div>
 
-    <!-- 主页面 -->
-    <main class="max-w-md mx-auto p-4">
-        <!-- 搜索页 -->
-        <div id="search-tab" class="tab-content active">
-            <header class="py-6">
-                <h2 class="text-3xl font-bold text-gray-800">探索词汇 <span class="text-pink-400">❤</span></h2>
-            </header>
-            <div class="relative mb-6">
-                <input id="wordInput" type="text" placeholder="输入生词或短语..." class="w-full p-5 pr-14 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-pink-300 outline-none text-lg">
-                <button onclick="searchWord()" class="absolute right-3 top-3 w-10 h-10 bg-pink-400 text-white rounded-xl flex items-center justify-center shadow-md">
-                    <i class="fas fa-search"></i>
-                </button>
-            </div>
-
-            <div id="cardResult" class="hidden animate-in fade-in duration-500">
-                <!-- AI 生成的内容注入此处 -->
-            </div>
+    <!-- 2. 主界面 -->
+    <main id="app" class="max-w-md mx-auto p-4 pb-24">
+        <!-- 搜索框 -->
+        <div class="relative mt-4">
+            <input id="word-input" type="text" placeholder="输入生词或短语..." class="w-full p-4 rounded-2xl shadow-sm border-none focus:ring-2 focus:ring-green-400">
+            <button onclick="searchWord()" class="absolute right-2 top-2 bg-green-500 text-white px-4 py-2 rounded-xl">查询</button>
         </div>
 
-        <!-- 笔记本页 -->
-        <div id="notebook-tab" class="tab-content">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">我的笔记本</h2>
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-font text-xs"></i>
-                    <input type="range" min="12" max="24" value="16" oninput="adjustFontSize(this.value)" class="w-24 accent-pink-400">
-                    <i class="fas fa-font text-lg"></i>
-                </div>
-            </div>
-            <div id="notebookList" class="space-y-4">
-                <!-- 收藏列表 -->
-            </div>
-        </div>
-
-        <!-- 闪卡页 -->
-        <div id="flash-tab" class="tab-content">
-            <div id="flashcard-container" class="mt-10">
-                <!-- 闪卡内容 -->
-            </div>
+        <!-- 结果卡片 -->
+        <div id="result-container" class="mt-6 space-y-4">
+            <!-- 动态插入卡片 -->
         </div>
     </main>
 
-    <!-- 底部导航 -->
-    <nav class="nav-bar">
-        <button onclick="switchTab('search')" class="flex flex-col items-center text-pink-400" id="nav-search">
-            <i class="fas fa-search-heart text-xl"></i><span class="text-[10px] mt-1">搜索</span>
+    <!-- 3. 底部导航栏 -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t flex justify-around p-3">
+        <button onclick="switchTab('search')" class="flex flex-col items-center text-green-600">
+            <span class="text-xs mt-1">搜索</span>
         </button>
-        <button onclick="switchTab('notebook')" class="flex flex-col items-center text-gray-400" id="nav-notebook">
-            <i class="fas fa-book-open text-xl"></i><span class="text-[10px] mt-1">笔记</span>
+        <button onclick="switchTab('notebook')" class="flex flex-col items-center text-slate-400">
+            <span class="text-xs mt-1">笔记本</span>
         </button>
-        <button onclick="switchTab('flash')" class="flex flex-col items-center text-gray-400" id="nav-flash">
-            <i class="fas fa-bolt text-xl"></i><span class="text-[10px] mt-1">复习</span>
+        <button onclick="switchTab('flashcard')" class="flex flex-col items-center text-slate-400">
+            <span class="text-xs mt-1">闪卡</span>
         </button>
     </nav>
 
     <script>
-        // --- 数据存储管理 ---
-        let config = JSON.parse(localStorage.getItem('xin_config')) || null;
-        let notebook = JSON.parse(localStorage.getItem('xin_notebook')) || [];
-        let api_key = "YOUR_API_KEY"; // 实际开发需通过后端或引导输入
+        // --- 核心逻辑 ---
+        let config = JSON.parse(localStorage.getItem('dict_config')) || null;
+        let notebook = JSON.parse(localStorage.getItem('dict_notebook')) || [];
 
         window.onload = () => {
             if (!config) {
-                document.getElementById('onboarding').classList.remove('hidden');
+                document.getElementById('lang-setup').classList.remove('hidden');
             }
-            renderNotebook();
         };
 
         function saveSettings() {
             config = {
-                native: document.getElementById('nativeLang').value,
-                target: document.getElementById('targetLang').value
+                native: document.getElementById('native-lang').value,
+                target: document.getElementById('target-lang').value
             };
-            localStorage.setItem('xin_config', JSON.stringify(config));
-            document.getElementById('onboarding').classList.add('hidden');
+            localStorage.setItem('dict_config', JSON.stringify(config));
+            document.getElementById('lang-setup').classList.add('hidden');
         }
 
-        // --- 搜索与 AI 逻辑 ---
+        // --- 语音功能 ---
+        function speak(text, lang) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang;
+            speechSynthesis.speak(utterance);
+        }
+
+        // --- 词汇查询 (模拟 AI 响应) ---
         async function searchWord() {
-            const word = document.getElementById('wordInput').value;
+            const word = document.getElementById('word-input').value;
             if(!word) return;
 
-            // 这里模拟 AI 返回的数据结构（实际应调用 OpenAI API）
-            // Prompt: 扮演一个朋友，用${config.native}解释词汇${word}...
+            // 这里应该是调用你的 AI API
             const mockData = {
                 word: word,
-                definition: "指在面临困难时展现出的不屈不挠的毅力和勇气。",
+                definition: "这个词在口语里超级常用，指代那种‘恍然大悟’的感觉。",
                 examples: [
-                    { t: "She showed great grit during the race.", n: "她在比赛中展现了惊人的毅力。" },
-                    { t: "Success takes grit and determination.", n: "成功需要坚韧和决心。" },
-                    { t: "Let's see if you've got the grit to finish this.", n: "让我们看看你是否有毅力完成这个。" }
+                    {target: "I finally got it!", native: "我终于懂了！", type: "spoken"},
+                    {target: "She elucidated the concept.", native: "她阐明了这个概念。", type: "written"}
                 ],
-                etymology: "原意是'沙砾'，后来比喻人像岩石般坚硬。就像朋友说的一样，这是描述一个人‘有骨气’的绝佳词汇！"
+                culture: "起源于古法语，原意是‘照亮’。"
             };
 
             renderCard(mockData);
         }
 
         function renderCard(data) {
-            const container = document.getElementById('cardResult');
-            container.innerHTML = `
-                <div class="glass-card p-6 shadow-xl relative mb-4" style="font-size: var(--card-font-size)">
+            const html = `
+                <div class="bg-white p-6 rounded-3xl shadow-xl border border-green-100">
                     <div class="flex justify-between items-start mb-4">
-                        <h3 class="text-3xl font-bold text-gray-800">${data.word}</h3>
-                        <button onclick="speak('${data.word}')" class="text-pink-400 text-xl"><i class="fas fa-volume-up"></i></button>
+                        <h2 class="text-2xl font-bold text-green-700">${data.word}</h2>
+                        <button onclick="speak('${data.word}', '${config.target}')" class="p-2 bg-green-50 rounded-full">🔊</button>
                     </div>
-                    <p class="text-pink-600 font-medium mb-4">${data.definition}</p>
-                    
+                    <p class="text-slate-600 mb-4">${data.definition}</p>
                     <div class="space-y-3 mb-6">
                         ${data.examples.map(ex => `
-                            <div class="bg-white/50 p-3 rounded-lg">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-bold text-gray-700">${ex.t}</span>
-                                    <button onclick="speak('${ex.t.replace(/'/g, "\\'")}')" class="text-blue-300 text-xs"><i class="fas fa-play"></i></button>
-                                </div>
-                                <div class="text-gray-500 text-sm italic">${ex.n}</div>
+                            <div class="bg-slate-50 p-3 rounded-lg">
+                                <p class="font-medium">${ex.target} <button onclick="speak('${ex.target}', '${config.target}')">🔈</button></p>
+                                <p class="text-sm text-slate-400">${ex.native}</p>
                             </div>
                         `).join('')}
                     </div>
-
-                    <div class="bg-yellow-50 p-4 rounded-2xl text-sm text-yellow-800 leading-relaxed">
-                        <i class="fas fa-lightbulb mr-1"></i> ${data.etymology}
+                    <div class="bg-amber-50 p-4 rounded-2xl border-l-4 border-amber-400 italic text-sm">
+                        <p>💡 ${data.culture}</p>
                     </div>
-
-                    <button onclick="addToNotebook('${data.word}')" class="mt-6 w-full py-3 border-2 border-pink-200 rounded-xl text-pink-400 font-bold hover:bg-pink-50">
-                        <i class="far fa-heart mr-2"></i> 保存到笔记本
-                    </button>
-                </div>
-
-                <div class="bg-white rounded-2xl p-4 shadow-sm">
-                    <div id="chatBox" class="text-sm text-gray-600 mb-3">针对这个词，还有什么想问的？</div>
-                    <div class="flex gap-2">
-                        <input type="text" placeholder="继续追问..." class="flex-1 bg-gray-100 rounded-lg p-2 text-sm outline-none">
-                        <button class="bg-gray-800 text-white px-4 rounded-lg text-sm">提问</button>
-                    </div>
+                    <button onclick="addToNotebook(${JSON.stringify(data).replace(/"/g, '&quot;')})" class="w-full mt-4 py-2 border-2 border-green-400 text-green-600 rounded-xl font-bold">加入笔记本</button>
                 </div>
             `;
-            container.classList.remove('hidden');
+            document.getElementById('result-container').innerHTML = html;
         }
 
-        // --- 发音功能 ---
-        function speak(text) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = config.target === 'en' ? 'en-US' : 'zh-CN'; // 根据目标语言自动切换
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
-        }
-
-        // --- 笔记本与复习系统 ---
-        function addToNotebook(word) {
-            if(!notebook.find(i => i.word === word)) {
-                notebook.push({
-                    word, 
-                    level: 0, 
-                    nextReview: Date.now(),
-                    status: '未学习', // 未学习, 学习中, 掌握
-                    addedAt: Date.now()
-                });
-                localStorage.setItem('xin_notebook', JSON.stringify(notebook));
-                alert('已收藏到心词典！');
-                renderNotebook();
-            }
-        }
-
-        function renderNotebook() {
-            const list = document.getElementById('notebookList');
-            list.innerHTML = notebook.map(item => `
-                <div class="glass-card p-4 flex justify-between items-center shadow-sm">
-                    <div>
-                        <div class="font-bold text-lg">${item.word}</div>
-                        <div class="text-[10px] uppercase tracking-widest text-gray-400">${item.status}</div>
-                    </div>
-                    <button onclick="speak('${item.word}')" class="w-10 h-10 rounded-full bg-pink-50 text-pink-400"><i class="fas fa-play"></i></button>
-                </div>
-            `).join('');
-        }
-
-        function adjustFontSize(size) {
-            document.documentElement.style.setProperty('--card-font-size', size + 'px');
-        }
-
-        // --- 闪卡复习逻辑 ---
-        function startFlashcards() {
-            const today = Date.now();
-            const toReview = notebook.filter(i => i.nextReview <= today);
-            
-            if(toReview.length === 0) {
-                document.getElementById('flashcard-container').innerHTML = `<div class="text-center py-20 text-gray-400">🎉 今日复习任务已完成！</div>`;
-                return;
-            }
-
-            const current = toReview[0];
-            document.getElementById('flashcard-container').innerHTML = `
-                <div class="flip-card" id="cardElement" onclick="this.classList.toggle('flipped')">
-                    <div class="flip-card-inner">
-                        <div class="flip-card-front glass-card shadow-2xl text-4xl font-bold text-gray-800">
-                            ${current.word}
-                            <div class="text-xs text-gray-300 mt-10">点击翻面</div>
-                        </div>
-                        <div class="flip-card-back glass-card shadow-2xl">
-                            <div class="text-2xl font-bold text-pink-400 mb-4">${current.word}</div>
-                            <p class="text-gray-600 text-center mb-4 px-4 text-sm leading-relaxed">释义：这里展示母语释义和例句...</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex justify-between mt-8 gap-4 px-4">
-                    <button onclick="handleSRS('${current.word}', 'forget')" class="btn-srs btn-forget flex-1">忘记</button>
-                    <button onclick="handleSRS('${current.word}', 'vague')" class="btn-srs btn-vague flex-1">模糊</button>
-                    <button onclick="handleSRS('${current.word}', 'know')" class="btn-srs btn-master flex-1">认识</button>
-                </div>
-            `;
-        }
-
-        function handleSRS(word, result) {
-            const item = notebook.find(i => i.word === word);
-            const intervals = [0, 1, 3, 7, 15, 30]; // 天数
-
-            if(result === 'know') {
-                item.level = Math.min(item.level + 1, intervals.length - 1);
-                item.status = item.level > 3 ? '掌握' : '学习中';
-            } else if(result === 'vague') {
-                item.level = Math.max(0, item.level - 1);
-            } else {
-                item.level = 0;
-                item.status = '学习中';
-            }
-
-            item.nextReview = Date.now() + (intervals[item.level] * 24 * 60 * 60 * 1000);
-            localStorage.setItem('xin_notebook', JSON.stringify(notebook));
-            startFlashcards(); // 加载下一张
-        }
-
-        // --- 导航控制 ---
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(`${tab}-tab`).classList.add('active');
-            
-            document.querySelectorAll('.nav-bar button').forEach(b => b.classList.replace('text-pink-400', 'text-gray-400'));
-            document.getElementById(`nav-${tab}`).classList.replace('text-gray-400', 'text-pink-400');
-            
-            if(tab === 'flash') startFlashcards();
+        function addToNotebook(data) {
+            // 添加 SRS 数据
+            const entry = {
+                ...data,
+                id: Date.now(),
+                status: 'unlearned', // unlearned, learning, mastered
+                interval: 0,
+                nextReview: Date.now()
+            };
+            notebook.push(entry);
+            localStorage.setItem('dict_notebook', JSON.stringify(notebook));
+            alert('已存入笔记本！');
         }
     </script>
 </body>
